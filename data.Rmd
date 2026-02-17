@@ -1,0 +1,38 @@
+---
+title: "nfl data"
+author: "Joey Gilmartin"
+date: "2026-01-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+pacman::p_load(nflfastR, dplyr, tidyr)
+
+pbp <- nflfastR::load_pbp(2024:2025)
+
+```
+
+
+```{r}
+data <- pbp |>
+  filter(
+    down == 4,
+    season_type == 'REG',
+    ydstogo <= 3,
+    play_type %in% c('run', 'pass'),
+    penalty == 0
+  ) |>
+  select(
+    game_id, desc, rusher, season, home_team, away_team, posteam, posteam_type, yardline_100, game_seconds_remaining, half_seconds_remaining, drive, ydstogo, play_type, shotgun, no_huddle, qb_dropback, qb_scramble, pass_length, pass_location, run_location, run_gap, posteam_timeouts_remaining, defteam_timeouts_remaining, posteam_score, defteam_score, score_differential, epa, rush_attempt, pass_attempt, rusher_player_name, penalty, series, fixed_drive, drive_play_count, drive_time_of_possession, drive_first_downs, drive_inside20, drive_yards_penalized, drive_start_transition, drive_start_yard_line, div_game, roof, surface, home_coach, away_coach, fourth_down_converted, first_down)
+```
+
+Designed QB Runs have rusher == 'qb_name', Scrambles have rusher == NA
+
+Data cleaning to do list
+- posteam_coach column
+- designed_qb_run column
+-
