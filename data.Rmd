@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 pacman::p_load(nflfastR, dplyr, tidyr)
 
-pbp <- nflfastR::load_pbp(2024:2025)
+pbp <- nflfastR::load_pbp(2016:2025)
 
 ```
 
