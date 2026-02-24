@@ -29,6 +29,26 @@ data <- pbp |>
   ) |>
   select(
     game_id, desc, rusher, season, home_team, away_team, posteam, posteam_type, yardline_100, game_seconds_remaining, half_seconds_remaining, drive, ydstogo, play_type, shotgun, no_huddle, qb_dropback, qb_scramble, pass_length, pass_location, run_location, run_gap, posteam_timeouts_remaining, defteam_timeouts_remaining, posteam_score, defteam_score, score_differential, epa, rush_attempt, pass_attempt, rusher_player_name, penalty, series, fixed_drive, drive_play_count, drive_time_of_possession, drive_first_downs, drive_inside20, drive_yards_penalized, drive_start_transition, drive_start_yard_line, div_game, roof, surface, home_coach, away_coach, fourth_down_converted, first_down)
+
+
+# sort through find qb, make list
+#ifelse(play_type == 'run & rusher_player_name contains one from list of qbs & scramble == 0, 1, 0)
+#drop rusher
+unique(qb_run$rusher_player_name)
+
+qbs <- qbs <- c( "J.Allen", "Jos.Allen", "T.Bagent", "M.Barkley", "B.Bortles", "T.Boyle",
+  "T.Brady", "J.Brissett",
+  "T.Bridgewater","J.Browning","J.Burrow","D.Carr","C.Daniel","K.Cousins","S.Darnold","T.DeVito",
+  "J.Dobbs","S.Ehlinger","J.Fields","N.Foles","J.Garoppolo","J.Goff","W.Grier",
+  "D.Haskins","T.Heinicke","J.Herbert","T.Hill","S.Howell","J.Hurts","D.Jones",
+  "M.Jones", "C.Kaepernick","C.Keenum","D.Kizer","T.Lance","T.Lawrence","W.Levis",
+  "J.Love","E.Manuel","P.Mahomes","E.Manning","D.Maye","C.McCoy","J.McCarthy","G.Minshew",
+  "G.Minshew II","D.Mills", "J.Milton","M.Mariota","B.Nix","B.Osweiler","N.Peterman", "M.Penix",
+  "K.Pickett","B.Purdy","A.Richardson","M.Rudolph","C.Rush","M.Ryan","A.Rodgers",
+  "Aa.Rodgers","B.Rypien","T.Savage","M.Stafford","J.Stidham","C.Stroud","R.Tannehill",
+  "T.Tagovailoa","T.Taylor","D.Watson", "R.Wilson",
+  "M.White","M.Willis","J.Winston","J.Wolford","B.Young"
+)
 ```
 
 
@@ -38,19 +58,13 @@ data <- pbp |>
 data <- data |> 
   mutate(
     posteam_coach = ifelse(posteam_type == 'home', home_coach, away_coach),
-    #designed_qb_run = ifelse( , 0,1),
+    designed_qb_run = ifelse(play_type == 'run' & rusher_player_name %in% qbs & qb_scramble == 0, 1, 0),
     #cumulative_succ_rt = 
   )
 
-
-qb_run <-  data |> filter(play_type == 'run') |> 
-  select(desc, rusher, play_type, rush_attempt, rusher_player_name, qb_scramble, qb_dropback, run_location, run_gap)
-
-
-# sort through find qb, make list
-#ifelse(play_type == 'run & rusher_player_name contains one from list of qbs & scramble == 0, 1, 0)
-#drop rusher
-unique(qb_run$rusher_player_name)
+# a test to make sure designed qb run works
+# qb_run <-  data |> filter(season == 2025, play_type == 'run', rusher_player_name %in% qbs) |> 
+#   select(desc, rusher, play_type, rush_attempt, rusher_player_name, qb_scramble, designed_qb_run, qb_dropback, run_location, run_gap, designed_qb_run)
 ```
 
 
