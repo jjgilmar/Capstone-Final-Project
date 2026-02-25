@@ -13,14 +13,22 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 pacman::p_load(nflfastR, dplyr, tidyr)
 
-pbp <- nflfastR::load_pbp(2016:2025)
+# Old way to get data, pulls from website, takes long
+#pbp <- nflfastR::load_pbp(2015:2025)
+
+# wrote to file, uploaded to github
+#write.csv(pbp, "NFL_pbp_2015_2025")
+
+# New way to get data
+pbp <- read.csv("NFL_pbp_2015_2025")
 
 ```
 
 ## Data Cleaning
 ```{r}
-data <- pbp |>
+down4 <- pbp |>
   filter(
+    season > 2015,
     down == 4,
     season_type == 'REG',
     ydstogo <= 3,
@@ -28,38 +36,87 @@ data <- pbp |>
     penalty == 0
   ) |>
   select(
-    game_id, desc, rusher, season, home_team, away_team, posteam, posteam_type, yardline_100, game_seconds_remaining, half_seconds_remaining, drive, ydstogo, play_type, shotgun, no_huddle, qb_dropback, qb_scramble, pass_length, pass_location, run_location, run_gap, posteam_timeouts_remaining, defteam_timeouts_remaining, posteam_score, defteam_score, score_differential, epa, rush_attempt, pass_attempt, rusher_player_name, penalty, series, fixed_drive, drive_play_count, drive_time_of_possession, drive_first_downs, drive_inside20, drive_yards_penalized, drive_start_transition, drive_start_yard_line, div_game, roof, surface, home_coach, away_coach, fourth_down_converted, first_down)
+    game_id, play_id, desc, season, home_team, away_team, posteam, posteam_type, yardline_100, game_seconds_remaining, half_seconds_remaining, drive, ydstogo, play_type, shotgun, no_huddle, qb_dropback, qb_scramble, pass_length, pass_location, run_location, run_gap, posteam_timeouts_remaining, defteam_timeouts_remaining, posteam_score, defteam_score, score_differential, epa, rush_attempt, pass_attempt, rusher_player_name, penalty, series, fixed_drive, drive_play_count, drive_time_of_possession, drive_first_downs, drive_inside20, drive_yards_penalized, drive_start_transition, drive_start_yard_line, div_game, roof, surface, home_coach, away_coach, fourth_down_converted, first_down)
 
 
+
+## MAKING DESIGNED QB RUN COLUMN
 # sort through find qb, make list
-#ifelse(play_type == 'run & rusher_player_name contains one from list of qbs & scramble == 0, 1, 0)
-#drop rusher
-unique(qb_run$rusher_player_name)
+#unique(qb_run$rusher_player_name)
 
-qbs <- qbs <- c( "J.Allen", "Jos.Allen", "T.Bagent", "M.Barkley", "B.Bortles", "T.Boyle",
-  "T.Brady", "J.Brissett",
-  "T.Bridgewater","J.Browning","J.Burrow","D.Carr","C.Daniel","K.Cousins","S.Darnold","T.DeVito",
-  "J.Dobbs","S.Ehlinger","J.Fields","N.Foles","J.Garoppolo","J.Goff","W.Grier",
-  "D.Haskins","T.Heinicke","J.Herbert","T.Hill","S.Howell","J.Hurts","D.Jones",
-  "M.Jones", "C.Kaepernick","C.Keenum","D.Kizer","T.Lance","T.Lawrence","W.Levis",
-  "J.Love","E.Manuel","P.Mahomes","E.Manning","D.Maye","C.McCoy","J.McCarthy","G.Minshew",
-  "G.Minshew II","D.Mills", "J.Milton","M.Mariota","B.Nix","B.Osweiler","N.Peterman", "M.Penix",
-  "K.Pickett","B.Purdy","A.Richardson","M.Rudolph","C.Rush","M.Ryan","A.Rodgers",
-  "Aa.Rodgers","B.Rypien","T.Savage","M.Stafford","J.Stidham","C.Stroud","R.Tannehill",
-  "T.Tagovailoa","T.Taylor","D.Watson", "R.Wilson",
-  "M.White","M.Willis","J.Winston","J.Wolford","B.Young"
+qbs <- qbs <- c( "J.Allen", "Jos.Allen", "T.Bagent", "M.Barkley", "B.Bortles", 
+                 "T.Boyle", "T.Brady", "J.Brissett", "T.Bridgewater",
+                 "J.Browning","J.Burrow","D.Carr","C.Daniel",
+                 "K.Cousins","S.Darnold","T.DeVito","J.Dobbs","S.Ehlinger",
+                 "J.Fields","N.Foles","J.Garoppolo","J.Goff","W.Grier",
+                 "D.Haskins","T.Heinicke","J.Herbert","T.Hill","S.Howell",
+                 "J.Hurts","D.Jones","M.Jones", "C.Kaepernick","C.Keenum",
+                 "D.Kizer","T.Lance","T.Lawrence","W.Levis","J.Love","E.Manuel",
+                 "P.Mahomes","E.Manning","D.Maye","C.McCoy","J.McCarthy",
+                 "G.Minshew","G.Minshew II","D.Mills", "J.Milton","M.Mariota",
+                 "B.Nix","B.Osweiler","N.Peterman","M.Penix","K.Pickett",
+                 "B.Purdy","A.Richardson","M.Rudolph","C.Rush","M.Ryan",
+                 "A.Rodgers","Aa.Rodgers","B.Rypien","T.Savage","M.Stafford",
+                 "J.Stidham","C.Stroud","R.Tannehill","T.Tagovailoa","T.Taylor",
+                 "D.Watson", "R.Wilson","M.White","M.Willis","J.Winston",
+                 "J.Wolford","B.Young"
 )
+
+
+
+## MAKING Cumulative Succ Rt Column
+down4 <- down4|>
+  # Ensure chronological order within each team-season
+  arrange(season, posteam, game_id, play_id)|>
+  group_by(season, posteam)|>
+  mutate(
+    # Cumulative counts *before* the current play (expanding window, lag by 1)
+    cum_conversions  = lag(cumsum(fourth_down_converted), n = 1, default = 0),
+    cum_attempts     = lag(row_number(),                  n = 1, default = 0),
+
+    # Rate — guard against division by zero on the first attempt
+    cum_conversion_rate = if_else(
+      cum_attempts == 0,
+      NA_real_,
+      cum_conversions / cum_attempts
+    )
+  )|>
+  ungroup()
+
+# Computing last year's success rates to account for NA, need to include 2015
+
+down4_w_2015 <- pbp|>
+                     filter(down == 4,
+                     play_type != 'punt', 
+                     play_type != 'no_play', 
+                     play_type != 'field_goal',
+                     play_type != 'qb_kneel',
+                     ydstogo <= 3,
+                     season_type == 'REG')
+
+prior_league_avg <- down4_w_2015|>
+  group_by(season)|>
+  summarise(league_avg_rate = mean(fourth_down_converted, na.rm = TRUE))|>
+  mutate(season = season + 1)  # shift forward so it joins onto the *next* season
+
+# Joining last year's success rates (need to load in the 2015 data as well)
+
+down4 <- down4|>
+  left_join(prior_league_avg, by = "season")|>
+  mutate(
+    cum_conversion_rate = coalesce(cum_conversion_rate, league_avg_rate)
+  )|>
+  select(-league_avg_rate)
 ```
 
 
 ## Feature Engineering
 ```{r}
 
-data <- data |> 
+down4 <- down4 |> 
   mutate(
     posteam_coach = ifelse(posteam_type == 'home', home_coach, away_coach),
     designed_qb_run = ifelse(play_type == 'run' & rusher_player_name %in% qbs & qb_scramble == 0, 1, 0),
-    #cumulative_succ_rt = 
   )
 
 # a test to make sure designed qb run works
