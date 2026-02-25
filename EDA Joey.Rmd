@@ -1,0 +1,134 @@
+---
+title: "EDA Joey"
+author: "Joey Gilmartin"
+date: "2026-02-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Visualizations
+```{r}
+
+## home / away success rate
+home_away_success <- down4 |>
+  group_by(posteam_type) |> 
+  summarise(
+    attempts = n(),
+    success_rate = mean(fourth_down_converted, na.rm = TRUE)
+  )
+
+ggplot(home_away_success, 
+       aes(x = posteam_type, 
+           y = success_rate, 
+           fill = posteam_type)) +
+  geom_col(width = 0.6) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Fourth Down Conversion Rate: Home vs Away",
+    x = "Offensive Team Type",
+    y = "Conversion Rate"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+## coach avg success rate (only take coaches with more than avg)
+  ## maybe split on something
+coach_success <- down4 |> 
+  group_by(home_coach) |> 
+  summarise(
+    attempts = n(),
+    conversion_rate = mean(fourth_down_converted, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+  filter(attempts > 60)
+
+ggplot(coach_success,
+       aes(x = reorder(home_coach, conversion_rate),
+           y = conversion_rate)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "4th Down Conversion Rate by Coach",
+    x = "",
+    y = "Conversion Rate"
+  ) +
+  theme_minimal()
+
+## NOTES: Sean McVay is the greatest offensive mind ever
+
+## drive play count / time of possession
+
+
+## attempts at each yard marker
+yard_summary <- down4 |> 
+  group_by(yardline_100) |> 
+  summarise(
+    attempts = n(),
+    conversion_rate = mean(fourth_down_converted, na.rm = TRUE),
+    .groups = "drop"
+  )
+  ## colored by 
+yard_summary |> filter(yardline_100 >5) |>
+ggplot(aes(x = yardline_100,
+           y = attempts,
+           color = conversion_rate)) +
+  geom_point(size = 3) +
+  scale_x_continuous(
+    breaks = seq(0, 100, 10),          # major breaks every 10
+    minor_breaks = seq(0, 100, 5),     # minor ticks every 5
+  ) +
+  scale_color_viridis_c(labels = scales::percent_format()) +
+  labs(
+    title = "4th Down Attempts by Yardline",
+    x = "Yards From Opponent Endzone",
+    y = "Attempts",
+    color = "Conversion Rate"
+  ) +
+  theme_minimal()
+
+
+## Using bins showed absolutely no trend  slight downsloped line across 60-55%
+# yard_bins <- down4 |> 
+#   mutate(
+#     yard_bin = cut(
+#       yardline_100,
+#       breaks = seq(0, 100, by = 5),
+#       include.lowest = TRUE,
+#       right = TRUE
+#     )
+#   ) |> 
+#   group_by(yard_bin) |> 
+#   summarise(
+#     attempts = n(),
+#     conversion_rate = mean(fourth_down_converted, na.rm = TRUE),
+#     .groups = "drop"
+#   )
+# ggplot(yard_bins,
+#        aes(x = yard_bin,
+#            y = conversion_rate,
+#            group = 1)) +
+#   geom_line() +
+#   geom_point() +
+#   scale_y_continuous(labels = scales::percent_format()) +
+#   labs(
+#     title = "4th Down Conversion Rate by Field Position (5-Yard Bins)",
+#     x = "Yards From Opponent Endzone",
+#     y = "Conversion Rate"
+#   ) +
+#   theme_minimal() +
+#   theme(
+#     axis.text.x = element_text(angle = 90, vjust = 0.5)
+#   )
+
+```
+
+
+## Early Model Building
+```{r}
+
+```
+
