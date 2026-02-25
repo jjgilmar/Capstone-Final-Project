@@ -124,6 +124,26 @@ ggplot(aes(x = yardline_100,
 #     axis.text.x = element_text(angle = 90, vjust = 0.5)
 #   )
 
+down4 %>%
+  mutate(
+    yard_bin = floor(yardline_100 / 5) * 5,
+    yd_bin = pmin(ydstogo, 10)  # cap long distances
+  ) %>%
+  group_by(yard_bin, yd_bin) %>%
+  summarise(rate = mean(fourth_down_converted, na.rm = TRUE),
+            attempts = n(),
+            .groups = "drop") %>%
+  ggplot(aes(x = yard_bin, y = yd_bin, fill = rate)) +
+  geom_tile() +
+  scale_fill_viridis_c(labels = scales::percent_format()) +
+  labs(
+    title = "4th Down Conversion Heatmap",
+    x = "Yards From Opponent Endzone",
+    y = "Yards To Go",
+    fill = "Conversion Rate"
+  ) +
+  theme_minimal()
+
 ```
 
 
