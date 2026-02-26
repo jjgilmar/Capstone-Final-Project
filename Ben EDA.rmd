@@ -1,0 +1,234 @@
+---
+title: "Capstone stuff"
+output: html_notebook
+---
+
+Exploring nflfastR predictors
+
+```{r}
+pacman::p_load(nflfastR, tidyverse)
+pbp <- load_pbp(2016:2025)
+down4 <- pbp|>filter(down == 4,
+                     play_type != 'punt', 
+                     play_type != 'no_play', 
+                     play_type != 'field_goal',
+                     play_type != 'qb_kneel',
+                     ydstogo <= 3,
+                     season_type == 'REG')
+
+unique(down4$play_type)
+```
+
+
+## EDA
+First, let's look at overall conversion success rates:
+```{r}
+mean(down4$fourth_down_converted) # 0.626
+mean(down4$fourth_down_failed) # 0.373
+
+conversion_rate <- ggplot(down4, aes(as.factor(fourth_down_converted), 
+                                     fill = as.factor(fourth_down_converted))) + 
+  geom_bar() +
+  geom_text(aes(label = paste0(round(after_stat(count)/sum(after_stat(count))*100, 1), "%")), 
+            stat = 'count', vjust = 2) +
+  geom_text(aes(label = after_stat(count)), stat = 'count', vjust = 4) +
+  theme_bw() +
+  theme(legend.position = 'none') +
+  labs(title = '4th and Short Conversion Rates',
+       subtitle = '4th and Short: 3 or Fewer Yards to Gain') +
+  xlab('Conversion Status') +
+  ylab('Occurrences') +
+  scale_x_discrete(labels = c('Conversion Failed', 'Conversion Successful')) +
+  scale_y_continuous(breaks = seq(0, 3000, 500),
+                     minor_breaks = seq(0, 3000, 250))
+  
+conversion_rate
+```
+
+When teams decide to go for it, they successfully convert 62.6% of the time.
+
+How do these differ by yards to go?
+```{r}
+conversion_by_yards <- ggplot(down4, aes(as.factor(fourth_down_converted), 
+                                         fill = as.factor(fourth_down_converted))) + 
+  geom_bar() +
+  geom_text(aes(label = after_stat(count)), stat = 'count', vjust = 2) +
+  theme_bw() +
+  theme(legend.position = 'none') +
+  labs(title = '4th and Short Conversion Rates',
+       subtitle = '4th and Short: 3 or Fewer Yards to Gain') +
+  xlab('Conversion Status') +
+  ylab('Occurrences') +
+  scale_x_discrete(labels = c('Failed', 'Successful')) +
+  scale_y_continuous(breaks = seq(0, 3000, 500),
+                     minor_breaks = seq(0, 3000, 250)) +
+  facet_wrap(~ydstogo)
+
+conversion_by_yards
+```
+
+How did conversion rates differ by team? Which teams go for it the most/least?
+```{r}
+colors <- teams_colors_logos|>rename(team = team_abbr)
+down4_2025 <- down4|>
+  filter(str_starts(game_id, "2025"))|>
+  rename(team = posteam)|>
+  group_by(team) |>
+  summarise(
+    attempts = n(),
+    conversions = sum(fourth_down_converted),
+    conversion_rate = mean(fourth_down_converted)
+  )
+
+down4_2025_colors <- left_join(down4_2025, colors, by = 'team')
+
+conv_2025 <- ggplot(down4_2025_colors, aes(reorder(team, -conversion_rate), conversion_rate, fill = team_color)) + 
+  geom_col() + 
+  scale_fill_identity() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = 'Fourth Down Conversion Success Rates, 2025') +
+  xlab('Team') +
+  ylab('Conversion Rate')
+  
+conv_2025
+```
+
+How have league-wide conversion rates changed over the past 10 years?
+```{r}
+down4_yby <- down4|>
+  rename(team = posteam)|>
+  group_by(year = substr(game_id, 1, 4))|>
+  summarise(
+    attempts = n(),
+    conversions = sum(fourth_down_converted),
+    conversion_rate = mean(fourth_down_converted)
+  )
+  
+yby_attempts <- ggplot(down4_yby, aes(as.numeric(year), attempts)) + 
+  geom_point() + 
+  geom_line() +
+  theme_bw() +
+  labs(title = '4th and Short Conversion Attempts, 2016-2025') +
+  xlab('Season') +
+  ylab('Attempts') +
+  scale_x_continuous(breaks = seq(2016, 2025, 1))
+
+yby_rates <- ggplot(down4_yby, aes(as.numeric(year), conversion_rate)) + 
+  geom_point() + 
+  geom_line() +
+  theme_bw() +
+  labs(title = '4th and Short Conversion Rates, 2016-2025') +
+  xlab('Season') +
+  ylab('Conversion Rate') +
+  scale_x_continuous(breaks = seq(2016, 2025, 1)) +
+  scale_y_continuous(labels = scales::percent)
+par(mfrow = c(2, 1))
+yby_attempts
+yby_rates
+```
+There is extremely high variance among conversion rates each year, although they consistently sit above 50%. However, the number of conversion attempts each year has skyrocketed, almost doubling from 2016 to 2025.
+
+Are run or pass plays more successful?
+```{r}
+down4_yby_play_type <- down4|>
+  rename(team = posteam)|>
+  group_by(year = substr(game_id, 1, 4), play_type)|>
+  summarise(
+    attempts = n(),
+    conversions = sum(fourth_down_converted),
+    conversion_rate = mean(fourth_down_converted)
+  )
+
+yby_rates_play_type <- ggplot(down4_yby_play_type, aes(as.numeric(year), conversion_rate, color = play_type)) + 
+  geom_point() + 
+  geom_line() +
+  theme_bw() +
+  labs(title = '4th and Short Conversion Rates, 2016-2025') +
+  xlab('Season') +
+  ylab('Conversion Rate') +
+  scale_x_continuous(breaks = seq(2016, 2025, 1)) +
+  scale_y_continuous(labels = scales::percent)
+
+yby_attempts_play_type <- ggplot(down4_yby_play_type, aes(as.numeric(year), attempts, color = play_type)) + 
+  geom_point() + 
+  geom_line() +
+  theme_bw() +
+  labs(title = '4th and Short Conversion Attempts, 2016-2025') +
+  xlab('Season') +
+  ylab('Attempts') +
+  scale_x_continuous(breaks = seq(2016, 2025, 1))
+
+
+yby_rates_play_type
+yby_attempts_play_type
+```
+Considering the vast discrepancy between success rates on running and passing plays, I anticipated a bigger gap between attempts on run/pass plays. However, only the 2020 season shows a gap in attempts by play type close to the one I was expecting. 
+
+## Feature Engineering
+We need a column tracking cumulative conversion success rates for each team up to that point in the season. Some week 1 data will return NA when a team hasn't attempted a 4th and short conversion yet. To account for this, we will replace the NA values 
+```{r}
+down4 <- down4|>
+  # Ensure chronological order within each team-season
+  arrange(season, posteam, game_id, play_id)|>
+  group_by(season, posteam)|>
+  mutate(
+    # Cumulative counts *before* the current play (expanding window, lag by 1)
+    cum_conversions  = lag(cumsum(fourth_down_converted), n = 1, default = 0),
+    cum_attempts     = lag(row_number(),                  n = 1, default = 0),
+
+    # Rate — guard against division by zero on the first attempt
+    cum_conversion_rate = if_else(
+      cum_attempts == 0,
+      NA_real_,
+      cum_conversions / cum_attempts
+    )
+  )|>
+  ungroup()
+
+# Computing last year's success rates to account for NA, need to include 2015
+
+down4_w_2015 <- load_pbp(2015:2025)|>
+                     filter(down == 4,
+                     play_type != 'punt', 
+                     play_type != 'no_play', 
+                     play_type != 'field_goal',
+                     play_type != 'qb_kneel',
+                     ydstogo <= 3,
+                     season_type == 'REG')
+
+prior_league_avg <- down4_w_2015|>
+  group_by(season)|>
+  summarise(league_avg_rate = mean(fourth_down_converted, na.rm = TRUE))|>
+  mutate(season = season + 1)  # shift forward so it joins onto the *next* season
+
+# Joining last year's success rates (need to load in the 2015 data as well)
+
+down4 <- down4|>
+  left_join(prior_league_avg, by = "season")|>
+  mutate(
+    cum_conversion_rate = coalesce(cum_conversion_rate, league_avg_rate)
+  )|>
+  select(-league_avg_rate)
+
+```
+
+Let's pick a random team and see how their success rate changes throughout the year. There will be some high variation at the start of the season due to the small sample size, but I'm interested in seeing how this behaves especially in the second half of the season. We will use the 2025 Steelers as our example
+```{r}
+steelers_25 <- down4|>filter(substr(game_id, 1, 4) == '2025',
+                             posteam == 'PIT')
+
+steelers_25_rate <- ggplot(steelers_25, 
+                           aes(x = cum_attempts, y = cum_conversion_rate)) + 
+  geom_line() +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  labs(title = 'Rolling Success Rate of Steelers 2025 Conversion Attempts') +
+  xlab('Attempts') +
+  ylab('Conversion Rate')
+
+steelers_25_rate
+  
+```
+
