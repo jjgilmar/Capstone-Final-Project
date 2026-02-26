@@ -91,8 +91,8 @@ ggplot(aes(x = yardline_100,
   theme_minimal()
 
 
-## Using bins showed absolutely no trend  slight downsloped line across 60-55%
-# yard_bins <- down4 |> 
+# # Using bins showed absolutely no trend  slight downsloped line across 60-55%
+# yard_bins <- down4 |>
 #   mutate(
 #     yard_bin = cut(
 #       yardline_100,
@@ -100,8 +100,8 @@ ggplot(aes(x = yardline_100,
 #       include.lowest = TRUE,
 #       right = TRUE
 #     )
-#   ) |> 
-#   group_by(yard_bin) |> 
+#   ) |>
+#   group_by(yard_bin) |>
 #   summarise(
 #     attempts = n(),
 #     conversion_rate = mean(fourth_down_converted, na.rm = TRUE),
@@ -141,6 +141,37 @@ down4 %>%
     x = "Yards From Opponent Endzone",
     y = "Yards To Go",
     fill = "Conversion Rate"
+  ) +
+  theme_minimal()
+
+ggplot(down4,
+       aes(x = score_differential,
+           y = fourth_down_converted)) +
+  geom_smooth(method = "loess", se = FALSE) +
+  #scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Conversion Probability by Score Differential",
+    x = "Score Differential (Offense - Defense)",
+    y = "Conversion Probability"
+  ) +
+  theme_minimal()
+
+
+down4 |> 
+  group_by(drive_play_count) |> 
+  summarise(
+    attempts = n(),
+    conversion_rate = mean(fourth_down_converted, na.rm = TRUE),
+    .groups = "drop"
+  ) |> 
+ggplot(aes(x = drive_play_count,
+           y = conversion_rate)) +
+  geom_col() +
+  #scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Conversion Probability by Drive Length",
+    x = "Plays in Drive",
+    y = "Conversion Probability"
   ) +
   theme_minimal()
 

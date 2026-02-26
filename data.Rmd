@@ -14,13 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 pacman::p_load(nflfastR, dplyr, tidyr, ggplot2, scales)
 
 # Old way to get data, pulls from website, takes long
-#pbp <- nflfastR::load_pbp(2015:2025)
-
-# wrote to file, uploaded to github
-#write.csv(pbp, "NFL_pbp_2015_2025")
-
-# New way to get data
-pbp <- read.csv("NFL_pbp_2015_2025")
+pbp <- nflfastR::load_pbp(2015:2025)
 
 ```
 
@@ -107,6 +101,20 @@ down4 <- down4|>
     cum_conversion_rate = coalesce(cum_conversion_rate, league_avg_rate)
   )|>
   select(-league_avg_rate)
+
+down4 <- down4 |> 
+  mutate(
+    drive_play_count = ifelse(
+      game_id == "2019_15_ATL_SF" & play_id == 678,
+      11,
+      drive_play_count
+    ),
+    drive_play_count = ifelse(
+      game_id == "2022_17_CLE_WAS" & play_id == 1580,
+      21,
+      drive_play_count
+    )
+  )
 ```
 
 
