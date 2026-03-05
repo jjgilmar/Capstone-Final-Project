@@ -113,6 +113,16 @@ down4 <- down4 |>
       game_id == "2022_17_CLE_WAS" & play_id == 1580,
       21,
       drive_play_count
+    ),
+    drive_play_count = ifelse(
+      game_id == "2018_02_IND_WAS" & play_id == 4031,
+      12,
+      drive_play_count
+    ),
+    drive_play_count = ifelse(
+      game_id == "2016_15_JAX_HOU" & play_id == 1636,
+      12,
+      drive_play_count
     )
   )
 ```

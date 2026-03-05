@@ -177,6 +177,43 @@ ggplot(aes(x = drive_play_count,
 
 ```
 
+```{r}
+heatmap_data <- down4 %>%
+  mutate(
+    yard_bin = floor(yardline_100 / 5) * 5,
+    ydstogo_bin = pmin(ydstogo, 10)
+  ) %>%
+  group_by(yard_bin, ydstogo_bin) %>%
+  summarise(
+    attempts = n(),
+    conversion_rate = mean(fourth_down_converted, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+ggplot(heatmap_data,
+       aes(x = yard_bin,
+           y = ydstogo_bin)) +
+  geom_tile(aes(fill = conversion_rate), color = "white") +
+  geom_point(aes(size = attempts), alpha = 0.6) +
+  scale_fill_viridis_c(labels = scales::percent_format()) +
+  scale_size(range = c(1,6)) +
+  scale_x_continuous(
+    breaks = seq(0,100,10),
+    minor_breaks = seq(0,100,5)
+  ) +
+  scale_y_continuous(breaks = 1:10) +
+  labs(
+    title = "4th Down Conversion Probability by Situation",
+    subtitle = "Color = Conversion Rate | Size = Number of Attempts",
+    x = "Yards From Opponent Endzone",
+    y = "Yards To Go",
+    fill = "Conversion Rate",
+    size = "Attempts"
+  ) +
+  theme_minimal()
+```
+
 
 ## Early Model Building
 ```{r}
