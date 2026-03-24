@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+pacman::p_load(dplyr, forcats)
 ```
 
 ## Data Visualizations
@@ -215,8 +217,335 @@ ggplot(heatmap_data,
 ```
 
 
-## Early Model Building
+## Early Model Building - Answering Coach Question
+```{r}
+library(lme4)
+library(dplyr)
+
+# --- Prep -----------------------------------------------------------
+down4_model <- down4 |>
+  mutate(
+    ydstogo    = factor(ydstogo),                          # 1, 2, 3 as categories
+    play_type  = factor(play_type, levels = c("run", "pass")), # run as reference
+    roof       = factor(roof),
+    surface    = factor(surface),
+    div_game   = factor(div_game),
+    # Scale continuous predictors
+    yardline_100_s        = scale(yardline_100),
+    score_diff_s          = scale(score_differential),
+    game_seconds_s        = scale(game_seconds_remaining),
+    cum_conversion_rate_s = scale(cum_conversion_rate)
+  ) |>
+  filter(!is.na(fourth_down_converted))                   # drop any stray NAs
+
+
+# --- Model 1: Core Situational --------------------------------------
+m1 <- glm(
+  fourth_down_converted ~
+    ydstogo +
+    yardline_100_s +
+    score_diff_s +
+    game_seconds_s,
+  data   = down4_model,
+  family = binomial
+)
+
+# --- Model 2: Add Play Design ---------------------------------------
+m2 <- glm(
+  fourth_down_converted ~
+    ydstogo +
+    yardline_100_s +
+    score_diff_s +
+    game_seconds_s +
+    play_type +
+    shotgun +
+    no_huddle,
+  data   = down4_model,
+  family = binomial
+)
+
+# --- Model 3: Full Preliminary --------------------------------------
+m3 <- glm(
+  fourth_down_converted ~
+    ydstogo +
+    yardline_100_s +
+    score_diff_s +
+    game_seconds_s +
+    play_type +
+    shotgun +
+    no_huddle +
+    cum_conversion_rate_s +
+    surface +
+    roof +
+    div_game,
+  data   = down4_model,
+  family = binomial
+)
+
+# --- Comparison -----------------------------------------------------
+AIC(m1, m2, m3)
+
+# Likelihood ratio tests (nested models)
+anova(m1, m2, test = "Chisq")   # Does play design improve over situational alone?
+anova(m2, m3, test = "Chisq")   # Does full set improve over play design?
+
+# Summaries
+summary(m1)
+summary(m2)
+summary(m3)
+
+
+# how to unscale model terms
+#0.110 / sd(down4_model$yardline_100)
+
+
+# designed qb runs are a really good predictor
+```
+
+```{r}
+m_final <- glm(
+  fourth_down_converted ~
+    ydstogo +
+    yardline_100_s +
+    play_type,
+  data   = down4_model,
+  family = binomial
+)
+
+summary(m_final)
+AIC(m2, m_final)
+```
+
+
+# Mixed Effect Model
+## Coaching 
+
+```{r}
+library(lme4)
+
+m_mixed <- glmer(
+  fourth_down_converted ~
+    ydstogo +
+    yardline_100_s +
+    play_type +
+    (1 | posteam_coach),
+  data   = down4_model,
+  family = binomial,
+  control = glmerControl(optimizer = "bobyqa")
+)
+
+summary(m_mixed)
+
+AIC(m_final, m_mixed)
+
+```
+
+```{r}
+# Also # Attempt counts for the join
+coach_counts <- down4_model |>
+  group_by(posteam_coach) |>
+  summarise(n = n())
+
+# Extract random effects
+coach_eff <- ranef(m_mixed) |>
+  data.frame() |>
+  select(posteam_coach = grp, condval)
+
+coach_eff <- left_join(
+  x = coach_eff,
+  y = coach_counts,
+  by = "posteam_coach"
+)|>
+  arrange(-condval) |>
+  mutate(`odds of success` = exp(condval) |> round(2)) |>
+  select(posteam_coach, attempts = n, `odds of success`, condval)
+
+coach_eff
+
+VarCorr(m_mixed)
+```
+
+## Plotting Coach Effects
+
+```{r}
+## wins? better teams convert more?
+gg_coach_eff <- 
+  coach_eff |> 
+  # Only keeping rows with at least 100 attempts
+  filter(attempts >= 80) |> 
+  # blue = above average, red = below average and reordering the kickers
+  mutate(
+    bar_col = if_else(condval > 0, "#013369", "#D50A0A"),
+    posteam_coach = fct_reorder(posteam_coach, condval)
+  ) |> 
+  
+  # Bar chart for kicker effects
+  ggplot(
+    mapping = aes(
+      x = forcats::fct_rev(posteam_coach),
+      y = abs(condval),
+      fill = bar_col
+    )
+  ) + 
+  
+  # Adding a line for the bars to sit on at 0
+  geom_hline(
+    linewidth = 1,
+    yintercept = 0
+  ) +
+  
+  geom_col(
+    color = "black"
+  ) +
+  
+  scale_fill_identity() + 
+  
+  scale_y_continuous(
+    limits = c(0, 0.2),
+    breaks = (0):5/10,
+    expand = c(0,0),
+    labels = round(exp(0:5/10), 1)
+  ) + 
+  
+  labs(
+    x = NULL,
+    y = "Odd of success", 
+    title = "Odds of 4th Down Conversion for NFL Head Coaches",
+    subtitle = "2016 - 2025 regular season; Minumum 80 attempts"
+  ) + 
+  
+  theme(
+    axis.text.x = element_text(
+      angle = 90,
+      hjust = 0.95,
+      vjust = 0.15
+    )
+  )
+
+
+
+gg_coach_eff
+```
+
+
+## Coach Team Combination
+```{r}
+# Create coach-team combination column
+down4_model <- down4_model |>
+  mutate(coach_team = paste(posteam_coach, posteam, sep = "_"))
+
+# Fit mixed model with coach-team random effect (no filtering)
+m_mixed_coach_team <- glmer(
+  fourth_down_converted ~
+    ydstogo +
+    yardline_100_s +
+    score_diff_s +
+    play_type +
+    no_huddle +
+    (1 | coach_team),
+  data    = down4_model,
+  family  = binomial,
+  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(m_mixed_coach_team)
+
+# Extract BLUPs
+coach_team_ranef <- ranef(m_mixed_coach_team)$coach_team |>
+  tibble::rownames_to_column("coach_team") |>
+  rename(ranef = `(Intercept)`) |>
+  arrange(desc(ranef))
+
+print(coach_team_ranef, n = Inf)
+
+VarCorr(m_mixed_coach_team)
+```
+
+
+## Coach team filtered
+```{r}
+# Attempts per coach-team combo
+coach_team_attempts <- down4_model |>
+  group_by(coach_team) |>
+  summarise(attempts = n()) |>
+  arrange(attempts)
+
+print(coach_team_attempts)
+mean(coach_team_attempts$attempts)
+
+# Filter to at or above average
+avg_attempts_ct <- mean(coach_team_attempts$attempts)
+
+coach_team_keep <- coach_team_attempts |>
+  filter(attempts >= avg_attempts_ct) |>
+  pull(coach_team)
+
+down4_filtered_ct <- down4_model |>
+  filter(coach_team %in% coach_team_keep)
+
+# Refit
+m_mixed_coach_team_filtered <- glmer(
+  fourth_down_converted ~
+    ydstogo +
+    yardline_100_s +
+    score_diff_s +
+    play_type +
+    no_huddle +
+    (1 | coach_team),
+  data    = down4_filtered_ct,
+  family  = binomial,
+  control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(m_mixed_coach_team_filtered)
+VarCorr(m_mixed_coach_team_filtered)
+
+
+# Coach-team attempt counts (already have this but need it for the join)
+coach_team_counts <- down4_model |>
+  group_by(coach_team) |>
+  summarise(n = n())
+
+# Extract random effects using your pattern
+coach_team_eff <- ranef(m_mixed_coach_team_filtered) |>
+  data.frame() |>
+  select(coach_team = grp, condval)
+
+coach_team_eff <- left_join(
+  x = coach_team_eff,
+  y = coach_team_counts,
+  by = "coach_team"
+)
+
+# Top and bottom 5
+bind_rows(
+  .id = "type",
+  "best"  = coach_team_eff |> slice_max(condval, n = 5),
+  "worst" = coach_team_eff |> slice_min(condval, n = 5)
+) |>
+  arrange(-condval) |>
+  mutate(`odds of success` = exp(condval) |> round(2)) |>
+  select(coach_team, attempts = n, `odds of success`)
+```
+
+
+hard to get accurate 
+- could try bootstrapping
+- explore interpreting the standard deviation
+  - why do coaches vary so much
+
+
+# Momentum Analysis
+
 ```{r}
 
 ```
+
+
+
+
+
+
+
+
 
