@@ -135,7 +135,12 @@ down4 <- down4 |>
   mutate(
     posteam_coach = ifelse(posteam_type == 'home', home_coach, away_coach),
     designed_qb_run = ifelse(play_type == 'run' & rusher_player_name %in% qbs & qb_scramble == 0, 1, 0),
+    top_seconds = as.integer(lubridate::ms(drive_time_of_possession), units = "secs"),
+    posteam_winning = ifelse(score_differential > 0, 1, 0),
+    play_in_rz = ifelse(yardline_100 <= 20, 1, 0)
   )
+
+down4 |> select(yardline_100, play_in_rz)
 
 # a test to make sure designed qb run works
 # qb_run <-  data |> filter(season == 2025, play_type == 'run', rusher_player_name %in% qbs) |> 

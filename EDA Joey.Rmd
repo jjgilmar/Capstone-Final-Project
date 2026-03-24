@@ -537,15 +537,33 @@ hard to get accurate
 
 # Momentum Analysis
 
-```{r}
+Hold constant: Yards to go, yardline 100
+Use drive play count, time of possession, drive first downs, 
+  cumulative success rate
 
+```{r}
+momentum_mod <- glm(
+  fourth_down_converted ~
+    ydstogo +
+    yardline_100 +
+    drive_first_downs +
+    posteam_winning + play_in_rz,
+  data   = down4,
+  family = binomial
+)
+
+summary(momentum_mod)
+
+
+## notes
+# cumulative success rate is not significant alone
+# drive play count is significant- but is not when drive first down is added to the model
+# same thing for time of possession
 ```
 
 
 
+```{r}
 
-
-
-
-
+```
 
