@@ -131,20 +131,49 @@ down4 <- down4 |>
 ## Feature Engineering
 ```{r}
 
+convert_drive_start <- function(drive_start, posteam) {
+  # Split "TEAM YY" into parts
+  if(drive_start == 50)
+    {return(drive_start)
+  } else {
+  
+  parts <- strsplit(drive_start, " ")[[1]]
+  team  <- parts[1]
+  yards <- as.integer(parts[2])
+  
+  # If the team in the field position matches the possession team,
+  # they're on their own side → distance to opponent's end zone = 100 - yards
+  # Otherwise they're in opponent territory → distance = yards
+  if (team == posteam) {
+    return(100L - yards)
+  } else {
+    return(yards)
+  }}
+}
+
 down4 <- down4 |> 
+  filter(!is.na(drive_start_yard_line))|>
+  mutate(
+    drive_start_100 = mapply(convert_drive_start, drive_start_yard_line, posteam),
+    drive_start_100 = as.integer(drive_start_100)) 
+
+# a test to make sure designed qb run works
+# qb_run <-  data |> filter(season == 2025, play_type == 'run', rusher_player_name %in% qbs) |> 
+#   select(desc, rusher, play_type, rush_attempt, rusher_player_name, qb_scramble, designed_qb_run, qb_dropback, run_location, run_gap, designed_qb_run)
+```
+
+
+```{r}
+down4 <- down4 |>  
   mutate(
     posteam_coach = ifelse(posteam_type == 'home', home_coach, away_coach),
     designed_qb_run = ifelse(play_type == 'run' & rusher_player_name %in% qbs & qb_scramble == 0, 1, 0),
     top_seconds = as.integer(lubridate::ms(drive_time_of_possession), units = "secs"),
     posteam_winning = ifelse(score_differential > 0, 1, 0),
-    play_in_rz = ifelse(yardline_100 <= 20, 1, 0)
+    play_in_rz = ifelse(yardline_100 <= 20, 1, 0),
+    drive_start_turnover = ifelse( drive_start_transition %in% c('INTERCEPTION', 'MUFFED_PUNT', 'DOWNS', 'MUFFED_KICKOFF'), 1, 0),
+    drive_yards = drive_start_100 - yardline_100
   )
-
-down4 |> select(yardline_100, play_in_rz)
-
-# a test to make sure designed qb run works
-# qb_run <-  data |> filter(season == 2025, play_type == 'run', rusher_player_name %in% qbs) |> 
-#   select(desc, rusher, play_type, rush_attempt, rusher_player_name, qb_scramble, designed_qb_run, qb_dropback, run_location, run_gap, designed_qb_run)
 ```
 
 
@@ -156,10 +185,4 @@ down4 |> select(yardline_100, play_in_rz)
 
 
 Designed QB Runs have rusher == 'qb_name', Scrambles have rusher == NA
-
-Data cleaning to do list
-- posteam_coach column
-- designed_qb_run column
-- Current/cumulative success rate
-- Write PBP, fourth_down to csv file, upload to github.
 

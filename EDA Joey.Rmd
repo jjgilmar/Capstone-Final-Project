@@ -545,9 +545,10 @@ Use drive play count, time of possession, drive first downs,
 momentum_mod <- glm(
   fourth_down_converted ~
     ydstogo +
-    yardline_100 +
     drive_first_downs +
-    posteam_winning + play_in_rz,
+    posteam_winning + 
+    drive_yards, 
+    #play_in_rz,
   data   = down4,
   family = binomial
 )
@@ -561,9 +562,10 @@ summary(momentum_mod)
 # same thing for time of possession
 ```
 
+# Play Type
+shotgun negative effect, no huddle positive, qb dropback, qb scramble very effective, designed qb run less effective but still works
 
 
 ```{r}
-
 ```
 
